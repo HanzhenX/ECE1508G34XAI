@@ -1,0 +1,1 @@
+## Setting Up the Project\n\nRun the following commands to set up the virtual environment and install dependencies:\n\n```bash\npython3.12 -m venv venv\nsource venv/bin/activate  # or venv\Scripts\activate on Windows\npip install -r requirements.txt\n```
