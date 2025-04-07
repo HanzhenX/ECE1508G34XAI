@@ -1,0 +1,4 @@
+/venv
+/.idea
+/notebooks/tmp
+/notebooks/trained_model.pth
