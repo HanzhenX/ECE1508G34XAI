@@ -7,6 +7,8 @@ from PIL import Image
 from torchvision import transforms
 from torchvision.models import resnet18
 from tqdm import tqdm
+import csv
+from sklearn.metrics import auc
 
 # === CONFIGURATION ===
 DATASET_DIR = "./data/SHRUNK_PATHMNIST_EXPLAIN"
@@ -64,6 +66,11 @@ def get_saliency(model, image, masks, p1=0.5):
 # === 5. Run Deletion Experiment ===
 def run_deletion(model, data, masks, steps):
     os.makedirs("./deletion_results/rise_deletion", exist_ok=True)
+    auc_path = "./deletion_results/rise_auc.csv"
+    with open(auc_path, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["filename", "auc"])
+    
     for img_tensor, label, fname in tqdm(data, desc="Running deletion"):
         saliency = get_saliency(model, img_tensor, masks)
         sal_map = saliency[label]
@@ -86,13 +93,21 @@ def run_deletion(model, data, masks, steps):
                 prob = torch.softmax(model(input_tensor), dim=1)[0, label].item()
             scores.append(prob)
 
+        x_vals = np.linspace(0, 1, steps + 1)
+        auc_val = auc(x_vals, scores) / 1.0  # normalized since x spans [0,1]
+
+        # Save AUC to CSV
+        with open(auc_path, "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([fname, auc_val])
+
         plt.plot(np.linspace(0, 1, steps + 1), scores)
-        plt.title(f"Rise Deletion Curve: {fname}")
+        plt.title(f"Rise Deletion Curve: {fname}\nAUC = {auc_val:.4f}")
         plt.xlabel("Fraction of Pixels Deleted")
         plt.ylabel("Predicted Probability")
         plt.grid(True)
         plt.ylim(0, 1.0)
-        plt.savefig(f"./results/rise_deletion/deletion_{fname}.png", bbox_inches='tight')
+        plt.savefig(f"./deletion_results/rise_deletion/deletion_{fname}.png", bbox_inches='tight')
         plt.close()
 
 # === Run All ===

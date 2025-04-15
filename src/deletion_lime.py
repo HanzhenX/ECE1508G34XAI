@@ -9,6 +9,8 @@ from torchvision import transforms
 from torchvision.models import resnet18
 from lime import lime_image
 from skimage.segmentation import felzenszwalb
+import csv
+from sklearn.metrics import auc
 
 # === CONFIGURATION ===
 DATASET_DIR = "./data/SHRUNK_PATHMNIST_EXPLAIN"
@@ -73,7 +75,12 @@ def get_lime_saliency(model, np_img, label):
 
 # === Run Deletion Experiment ===
 def run_deletion(model, data, steps=100):
-    os.makedirs("./deletion_results/lime_deletion", exist_ok=True)
+    os.makedirs("./deletion_results", exist_ok=True)
+    auc_path = "./deletion_results/lime_auc.csv"
+    with open(auc_path, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["filename", "auc"])
+        
     for img_tensor, label, fname in tqdm(data, desc="Running LIME deletion"):
         unnorm = img_tensor * 0.5 + 0.5
         np_img = (unnorm.numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
@@ -95,14 +102,20 @@ def run_deletion(model, data, steps=100):
                 prob = torch.softmax(model(input_tensor), dim=1)[0, label].item()
             scores.append(prob)
 
-        plt.plot(np.linspace(0, 1, steps + 1), scores)
-        plt.title(f"LIME Deletion Curve: {fname}")
+        x_vals = np.linspace(0, 1, steps + 1)
+        auc_val = auc(x_vals, scores)
+        plt.plot(x_vals, scores)
+        plt.title(f"LIME Deletion Curve: {fname}\nAUC = {auc_val:.4f}")
         plt.xlabel("Fraction of Pixels Deleted")
         plt.ylabel("Predicted Probability")
         plt.grid(True)
         plt.ylim(0, 1.0)
-        plt.savefig(f"./results/lime_deletion/deletion_{fname}.png", bbox_inches='tight')
+        plt.savefig(f"./deletion_results/lime_deletion/deletion_{fname}.png", bbox_inches='tight')
         plt.close()
+
+        with open(auc_path, "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([fname, auc_val])
 
 # === Main ===
 if __name__ == "__main__":
